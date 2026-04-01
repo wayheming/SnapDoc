@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'processor' => [
+        'url' => env('PROCESSOR_URL', 'http://processor:8000'),
+    ],
+
 ];
