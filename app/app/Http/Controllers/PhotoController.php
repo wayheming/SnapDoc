@@ -9,25 +9,27 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PhotoController extends Controller
 {
-    public function preview(string $uuid): \Illuminate\Http\Response
+    public function preview(string $uuid): \Symfony\Component\HttpFoundation\BinaryFileResponse
     {
         $order = PhotoOrder::where('uuid', $uuid)
             ->where('expires_at', '>', now())
             ->whereNotNull('result_clean_path')
             ->firstOrFail();
 
-        $bytes = Storage::get($order->result_clean_path);
+        $path = Storage::path($order->result_clean_path);
 
-        return response($bytes, 200, ['Content-Type' => 'image/png']);
+        return response()->file($path, ['Content-Type' => 'image/png']);
     }
 
-    public function download(string $uuid): StreamedResponse
+    public function download(string $uuid): \Symfony\Component\HttpFoundation\BinaryFileResponse
     {
         $order = PhotoOrder::where('uuid', $uuid)
             ->where('expires_at', '>', now())
             ->whereNotNull('result_clean_path')
             ->firstOrFail();
 
-        return Storage::download($order->result_clean_path, 'photo.png');
+        $path = Storage::path($order->result_clean_path);
+
+        return response()->download($path, 'photo.png', ['Content-Type' => 'image/png']);
     }
 }

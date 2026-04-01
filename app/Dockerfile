@@ -29,8 +29,11 @@ RUN composer dump-autoload --optimize
 
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 
-RUN mkdir -p storage/app/originals storage/app/results storage/framework/cache \
-    storage/framework/sessions storage/framework/views bootstrap/cache \
+RUN mkdir -p storage/app/private/livewire-tmp storage/app/private/originals \
+    storage/app/private/results storage/app/public \
+    storage/framework/cache storage/framework/sessions storage/framework/views \
+    bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
 
 RUN echo "upload_max_filesize = 20M" > /usr/local/etc/php/conf.d/uploads.ini \
