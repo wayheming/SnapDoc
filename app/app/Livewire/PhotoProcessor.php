@@ -10,6 +10,7 @@ use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
+#[Layout('layouts.app')]
 class PhotoProcessor extends Component
 {
     use WithFileUploads;
