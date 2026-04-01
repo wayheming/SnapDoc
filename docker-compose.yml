@@ -1,13 +1,57 @@
 services:
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    volumes:
+      - ./app:/var/www/html
+      - app-storage:/var/www/html/storage/app
+    environment:
+      APP_KEY: "${APP_KEY}"
+      APP_ENV: local
+      DB_CONNECTION: sqlite
+      QUEUE_CONNECTION: redis
+      REDIS_HOST: redis
+      PROCESSOR_URL: http://processor:8000
+    depends_on:
+      - redis
+      - processor
+
+  worker:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    command: php artisan queue:work redis --sleep=3 --tries=3
+    volumes:
+      - ./app:/var/www/html
+      - app-storage:/var/www/html/storage/app
+    environment:
+      APP_KEY: "${APP_KEY}"
+      APP_ENV: local
+      DB_CONNECTION: sqlite
+      QUEUE_CONNECTION: redis
+      REDIS_HOST: redis
+      PROCESSOR_URL: http://processor:8000
+    depends_on:
+      - redis
+      - processor
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+
   processor:
     build: ./processor
-    ports:
-      - "8000:8000"
     volumes:
-      - ./processor:/app          # hot reload для розробки
-      - rembg-models:/root/.u2net # кеш моделей між рестартами
+      - ./processor:/app
+      - rembg-models:/root/.u2net
     environment:
-      - PYTHONUNBUFFERED=1
+      PYTHONUNBUFFERED: "1"
 
 volumes:
   rembg-models:
+  redis-data:
+  app-storage:
