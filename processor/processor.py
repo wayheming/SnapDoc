@@ -1,6 +1,6 @@
 import io
 
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter, ImageFilter
 
 _rembg_session = None
 _face_detection = None
@@ -52,9 +52,9 @@ def remove_background(image: Image.Image) -> Image.Image:
         image,
         session=_get_rembg_session(),
         alpha_matting=True,
-        alpha_matting_foreground_threshold=240,
-        alpha_matting_background_threshold=10,
-        alpha_matting_erode_size=10,
+        alpha_matting_foreground_threshold=210,
+        alpha_matting_background_threshold=15,
+        alpha_matting_erode_size=3,
     )
 
 
@@ -111,7 +111,7 @@ def add_white_background(image: Image.Image) -> Image.Image:
     return background.convert("RGB")
 
 
-def process_photo(image_bytes: bytes, width_mm: int = 35, height_mm: int = 45, dpi: int = 300) -> bytes:
+def process_photo(image_bytes: bytes, width_mm: int = 35, height_mm: int = 45, dpi: int = 600) -> bytes:
     """Повний пайплайн для фото на документи."""
     width_px = int(width_mm / 25.4 * dpi)
     height_px = int(height_mm / 25.4 * dpi)
@@ -137,7 +137,13 @@ def process_photo(image_bytes: bytes, width_mm: int = 35, height_mm: int = 45, d
     # Масштабуємо до фінального розміру в пікселях
     result = result.resize((width_px, height_px), Image.LANCZOS)
 
+    # Шарпенінг після resize (стандарт для фото на документи)
+    result = result.filter(ImageFilter.UnsharpMask(radius=1.5, percent=80, threshold=2))
+
+    # Легке підвищення контрасту
+    result = ImageEnhance.Contrast(result).enhance(1.05)
+
     # Зберігаємо в PNG
     output = io.BytesIO()
-    result.save(output, format="PNG")
+    result.save(output, format="PNG", optimize=False)
     return output.getvalue()
