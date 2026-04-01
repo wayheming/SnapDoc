@@ -4,20 +4,28 @@ services:
       context: ./app
       dockerfile: Dockerfile
     ports:
-      - "80:80"
+      - "8099:80"
     volumes:
       - ./app:/var/www/html
       - app-storage:/var/www/html/storage/app
     environment:
-      APP_KEY: "${APP_KEY}"
       APP_ENV: local
-      DB_CONNECTION: sqlite
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: photo_processor
+      DB_USERNAME: photo
+      DB_PASSWORD: secret
       QUEUE_CONNECTION: redis
       REDIS_HOST: redis
       PROCESSOR_URL: http://processor:8000
     depends_on:
-      - redis
-      - processor
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      processor:
+        condition: service_started
 
   worker:
     build:
@@ -28,15 +36,37 @@ services:
       - ./app:/var/www/html
       - app-storage:/var/www/html/storage/app
     environment:
-      APP_KEY: "${APP_KEY}"
       APP_ENV: local
-      DB_CONNECTION: sqlite
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: photo_processor
+      DB_USERNAME: photo
+      DB_PASSWORD: secret
       QUEUE_CONNECTION: redis
       REDIS_HOST: redis
       PROCESSOR_URL: http://processor:8000
     depends_on:
-      - redis
-      - processor
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      processor:
+        condition: service_started
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: photo_processor
+      POSTGRES_USER: photo
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U photo -d photo_processor"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7-alpine
@@ -54,4 +84,5 @@ services:
 volumes:
   rembg-models:
   redis-data:
+  postgres-data:
   app-storage:

@@ -11,7 +11,7 @@ class DocumentFormatSeeder extends Seeder
     {
         $formats = [
             ['name' => 'UA Passport',        'country' => 'UA', 'width_mm' => 35, 'height_mm' => 45, 'dpi' => 300, 'is_active' => true, 'sort_order' => 1],
-            ['name' => 'International Pass.','country' => 'INT','width_mm' => 35, 'height_mm' => 45, 'dpi' => 300, 'is_active' => true, 'sort_order' => 2],
+            ['name' => 'International Pass.','country' => 'UA', 'width_mm' => 35, 'height_mm' => 45, 'dpi' => 300, 'is_active' => true, 'sort_order' => 2],
             ['name' => 'ID Card UA',         'country' => 'UA', 'width_mm' => 25, 'height_mm' => 35, 'dpi' => 300, 'is_active' => true, 'sort_order' => 3],
             ['name' => 'US Passport',        'country' => 'US', 'width_mm' => 51, 'height_mm' => 51, 'dpi' => 300, 'is_active' => true, 'sort_order' => 4],
             ['name' => 'US Visa',            'country' => 'US', 'width_mm' => 51, 'height_mm' => 51, 'dpi' => 300, 'is_active' => true, 'sort_order' => 5],
