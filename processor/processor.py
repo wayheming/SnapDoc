@@ -91,13 +91,9 @@ def compose_document_photo(image: Image.Image, face: tuple[int, int, int, int], 
 
     cropped = image.crop((left, top, right, bottom))
 
-    # Якщо кроп менший за потрібний — вставляємо на білий фон потрібного розміру
-    if cropped.width < target_w or cropped.height < target_h:
-        canvas = Image.new("RGBA", (target_w, target_h), (255, 255, 255, 255))
-        paste_x = (target_w - cropped.width) // 2
-        paste_y = 0  # завжди зверху
-        canvas.paste(cropped, (paste_x, paste_y), cropped if cropped.mode == "RGBA" else None)
-        return canvas
+    # Масштабуємо кроп до потрібних пропорцій (без білих полів)
+    if cropped.width != target_w or cropped.height != target_h:
+        cropped = cropped.resize((target_w, target_h), Image.LANCZOS)
 
     return cropped
 
