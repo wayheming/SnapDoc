@@ -1,26 +1,34 @@
 import io
 
-import mediapipe as mp
-import numpy as np
 from PIL import Image
-from rembg import new_session, remove
 
-# birefnet-portrait — найточніша модель для портретів, чисті краї на волоссі
-_rembg_session = new_session("birefnet-portrait")
+_rembg_session = None
+_face_detection = None
 
-# MediaPipe Face Detection
-_face_detection = mp.solutions.face_detection.FaceDetection(
-    model_selection=1, min_detection_confidence=0.5
-)
 
-# Пропорції фото на документи (3:4)
-DOC_PHOTO_RATIO = 3 / 4
+def _get_rembg_session():
+    global _rembg_session
+    if _rembg_session is None:
+        from rembg import new_session
+        _rembg_session = new_session("birefnet-portrait")
+    return _rembg_session
+
+
+def _get_face_detection():
+    global _face_detection
+    if _face_detection is None:
+        import mediapipe as mp
+        _face_detection = mp.solutions.face_detection.FaceDetection(
+            model_selection=1, min_detection_confidence=0.5
+        )
+    return _face_detection
 
 
 def detect_face(image: Image.Image) -> tuple[int, int, int, int] | None:
     """Повертає bbox обличчя (x, y, w, h) або None."""
+    import numpy as np
     rgb = np.array(image)
-    results = _face_detection.process(rgb)
+    results = _get_face_detection().process(rgb)
 
     if not results.detections:
         return None
@@ -39,9 +47,10 @@ def detect_face(image: Image.Image) -> tuple[int, int, int, int] | None:
 
 def remove_background(image: Image.Image) -> Image.Image:
     """Видаляє фон з зображення через rembg з alpha matting для чистих країв."""
+    from rembg import remove
     return remove(
         image,
-        session=_rembg_session,
+        session=_get_rembg_session(),
         alpha_matting=True,
         alpha_matting_foreground_threshold=240,
         alpha_matting_background_threshold=10,
@@ -49,21 +58,20 @@ def remove_background(image: Image.Image) -> Image.Image:
     )
 
 
-def compose_document_photo(image: Image.Image, face: tuple[int, int, int, int]) -> Image.Image:
+def compose_document_photo(image: Image.Image, face: tuple[int, int, int, int], doc_ratio: float = 3 / 4) -> Image.Image:
     """Компонує фото на документи з правильними пропорціями і кадруванням.
 
     Стандарт: обличчя займає ~60-70% висоти, зверху відступ ~15%.
-    Пропорції 3:4 (ширина:висота).
+    doc_ratio — відношення ширини до висоти (напр. 3/4).
     """
     face_x, face_y, face_w, face_h = face
     img_w, img_h = image.size
 
     face_center_x = face_x + face_w // 2
-    face_center_y = face_y + face_h // 2
 
     # Висота фінального кадру: обличчя = ~35% висоти (голова + волосся ~50%)
     target_h = int(face_h / 0.35)
-    target_w = int(target_h * DOC_PHOTO_RATIO)
+    target_w = int(target_h * doc_ratio)
 
     # Верхній край: обличчя починається на ~25% від верху
     top = face_y - int(target_h * 0.25)
@@ -103,8 +111,12 @@ def add_white_background(image: Image.Image) -> Image.Image:
     return background.convert("RGB")
 
 
-def process_photo(image_bytes: bytes) -> bytes:
+def process_photo(image_bytes: bytes, width_mm: int = 35, height_mm: int = 45, dpi: int = 300) -> bytes:
     """Повний пайплайн для фото на документи."""
+    width_px = int(width_mm / 25.4 * dpi)
+    height_px = int(height_mm / 25.4 * dpi)
+    doc_ratio = width_mm / height_mm
+
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
 
     # Детект обличчя (потрібен для кадрування)
@@ -113,14 +125,17 @@ def process_photo(image_bytes: bytes) -> bytes:
     # Видалення фону (birefnet-portrait + alpha matting)
     no_bg = remove_background(image)
 
-    # Кадрування під документне фото (3:4, обличчя по центру)
+    # Кадрування під документне фото (обличчя по центру)
     if face:
-        composed = compose_document_photo(no_bg, face)
+        composed = compose_document_photo(no_bg, face, doc_ratio=doc_ratio)
     else:
         composed = no_bg
 
     # Білий фон
     result = add_white_background(composed)
+
+    # Масштабуємо до фінального розміру в пікселях
+    result = result.resize((width_px, height_px), Image.LANCZOS)
 
     # Зберігаємо в PNG
     output = io.BytesIO()
