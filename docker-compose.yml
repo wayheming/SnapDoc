@@ -1,0 +1,13 @@
+services:
+  processor:
+    build: ./processor
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./processor:/app          # hot reload для розробки
+      - rembg-models:/root/.u2net # кеш моделей між рестартами
+    environment:
+      - PYTHONUNBUFFERED=1
+
+volumes:
+  rembg-models:
