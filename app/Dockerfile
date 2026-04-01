@@ -7,8 +7,10 @@ RUN apk add --no-cache \
     libpng-dev \
     ttf-dejavu \
     sqlite sqlite-dev \
+    icu-dev \
+    libzip-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install gd pdo pdo_sqlite
+    && docker-php-ext-install gd pdo pdo_sqlite intl zip
 
 RUN apk add --no-cache $PHPIZE_DEPS \
     && pecl install redis \
