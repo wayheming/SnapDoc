@@ -1,6 +1,6 @@
 import io
 
-from PIL import Image, ImageEnhance, ImageFilter, ImageFilter
+from PIL import Image, ImageFilter
 
 _rembg_session = None
 _face_detection = None
@@ -136,12 +136,6 @@ def process_photo(image_bytes: bytes, width_mm: int = 35, height_mm: int = 45, d
 
     # Масштабуємо до фінального розміру в пікселях
     result = result.resize((width_px, height_px), Image.LANCZOS)
-
-    # Шарпенінг після resize (стандарт для фото на документи)
-    result = result.filter(ImageFilter.UnsharpMask(radius=1.5, percent=80, threshold=2))
-
-    # Легке підвищення контрасту
-    result = ImageEnhance.Contrast(result).enhance(1.05)
 
     # Зберігаємо в PNG
     output = io.BytesIO()
