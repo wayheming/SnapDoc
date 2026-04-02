@@ -91,9 +91,16 @@ def compose_document_photo(image: Image.Image, face: tuple[int, int, int, int], 
 
     cropped = image.crop((left, top, right, bottom))
 
-    # Масштабуємо кроп до потрібних пропорцій (без білих полів)
-    if cropped.width != target_w or cropped.height != target_h:
-        cropped = cropped.resize((target_w, target_h), Image.LANCZOS)
+    # Масштабуємо зі збереженням пропорцій (cover-fit), потім кропаємо зайве
+    crop_w, crop_h = cropped.size
+    if crop_w != target_w or crop_h != target_h:
+        scale = max(target_w / crop_w, target_h / crop_h)
+        scaled_w = int(crop_w * scale)
+        scaled_h = int(crop_h * scale)
+        cropped = cropped.resize((scaled_w, scaled_h), Image.LANCZOS)
+        cx = (scaled_w - target_w) // 2
+        cy = (scaled_h - target_h) // 2
+        cropped = cropped.crop((cx, cy, cx + target_w, cy + target_h))
 
     return cropped
 
