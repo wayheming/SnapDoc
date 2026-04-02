@@ -11,7 +11,7 @@
 
                 @if ($photo)
                     {{-- Preview of uploaded photo --}}
-                    <div class="relative rounded-xl overflow-hidden border border-indigo-200 bg-gray-50 mb-3">
+                    <div class="relative rounded-xl overflow-hidden border border-indigo-500/[0.15] bg-gray-50 mb-3">
                         <img src="{{ $photo->temporaryUrl() }}" alt="Preview"
                              class="w-full max-h-64 object-contain mx-auto block p-2">
                         <button type="button" wire:click="$set('photo', null)"
@@ -23,7 +23,7 @@
                     </div>
                     <p class="text-xs text-gray-400 mb-1">{{ $photo->getClientOriginalName() }}</p>
                 @else
-                    <div class="relative border-2 border-dashed border-gray-200 rounded-xl p-6 text-center hover:border-indigo-400 transition-colors">
+                    <div class="relative border-2 border-dashed border-indigo-500/[0.25] rounded-xl p-6 text-center hover:border-indigo-500 transition-colors">
                         <input type="file" wire:model="photo" accept="image/*"
                                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
                         <div class="space-y-2">
@@ -53,7 +53,7 @@
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Document Format</label>
                 <select wire:model="documentFormatId"
-                        class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-gray-50 hover:bg-white transition">
+                        class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-[#f9fafb] hover:bg-white transition">
                     <option value="">— Select format —</option>
                     @foreach ($formats as $country => $countryFormats)
                         <optgroup label="{{ $country }}">
@@ -82,8 +82,9 @@
             @error('privacyAccepted') <p class="text-red-500 text-sm">{{ $message }}</p> @enderror
 
             <button type="submit"
-                    class="w-full gradient-bg text-white py-4 rounded-xl font-semibold text-lg
-                           hover:opacity-90 hover:shadow-lg hover:shadow-indigo-500/25 transition-all duration-300 transform hover:-translate-y-0.5">
+                    class="w-full gradient-bg text-white py-4 rounded-[14px] font-bold text-lg
+                           shadow-[0_4px_16px_rgba(99,102,241,0.3)] hover:shadow-[0_8px_24px_rgba(99,102,241,0.4)]
+                           transition-all duration-300 transform hover:-translate-y-0.5">
                 <span wire:loading.remove>Process Photo</span>
                 <span wire:loading class="flex items-center justify-center gap-2">
                     <svg class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
@@ -143,8 +144,9 @@
                     <p class="text-gray-900 font-bold text-xl mb-1">Photo Ready!</p>
                     <p class="text-gray-500 text-sm mb-6">Your document photo has been processed successfully</p>
                     <a href="{{ route('download', $order->uuid) }}"
-                       class="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-green-600 text-white px-8 py-4 rounded-xl font-semibold text-lg
-                              hover:from-emerald-600 hover:to-green-700 hover:shadow-lg hover:shadow-green-500/25 transition-all duration-300 transform hover:-translate-y-0.5">
+                       class="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-green-600 text-white px-8 py-4 rounded-[14px] font-bold text-lg
+                              hover:from-emerald-600 hover:to-green-700 shadow-[0_4px_16px_rgba(16,185,129,0.3)] hover:shadow-[0_8px_24px_rgba(16,185,129,0.4)]
+                              transition-all duration-300 transform hover:-translate-y-0.5">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                         </svg>
