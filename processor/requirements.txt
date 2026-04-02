@@ -1,5 +1,5 @@
 rembg[cpu]
-mediapipe
+mediapipe==0.10.21
 pillow
 fastapi
 uvicorn

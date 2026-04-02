@@ -14,6 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('orders:clean')->hourly();
     })
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->trustProxies(at: "*");
         //
     })
     ->withExceptions(function (Exceptions $exceptions): void {
