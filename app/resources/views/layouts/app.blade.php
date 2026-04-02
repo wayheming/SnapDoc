@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ config('app.name', 'SnapDoc') }} — Free Passport & Visa Photo Maker</title>
     <meta name="description" content="Create perfect passport and visa photos in seconds. Free, no registration required. AI-powered background removal and precise document format sizing.">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
