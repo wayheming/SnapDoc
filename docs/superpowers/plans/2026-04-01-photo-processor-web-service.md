@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** B2C веб-сервіс для обробки фото на документи — Laravel + Livewire фронтенд, FastAPI процесор, Filament адмінка, Docker Compose.
+**Goal:** B2C web service for processing passport/visa photos — Laravel + Livewire frontend, FastAPI processor, Filament admin panel, Docker Compose.
 
-**Architecture:** Laravel 13 оркеструє флоу: зберігає фото в local storage, ставить job у Redis чергу; worker відправляє в FastAPI processor, зберігає clean + watermark результати; Livewire polling показує прев'ю; payment stub дозволяє завантажити чисте фото. Без авторизації — order ідентифікується UUID.
+**Architecture:** Laravel 13 orchestrates the flow: stores uploaded photo in local storage, dispatches a Redis queue job; worker sends it to the FastAPI processor, saves the processed clean result; Livewire polling shows the preview; clean photo is available for free download immediately after processing. No user registration — orders are identified by UUID.
 
-**Tech Stack:** Laravel 13, Filament 5, Livewire 3, PHP 8.3, SQLite, Redis, FastAPI Python 3.11, Docker Compose, GD extension (watermark), Pest (PHP tests), pytest (Python tests)
+**Tech Stack:** Laravel 13, Filament 5, Livewire 3, PHP 8.3, SQLite, Redis, FastAPI Python 3.11, Docker Compose, GD extension, Pest (PHP tests), pytest (Python tests)
 
 ---
 
@@ -14,7 +14,7 @@
 
 ```
 photo-processor/
-├── app/                                          ← Laravel (новий)
+├── app/                                          ← Laravel (new)
 │   ├── app/
 │   │   ├── Models/
 │   │   │   ├── DocumentFormat.php
@@ -22,8 +22,7 @@ photo-processor/
 │   │   ├── Jobs/
 │   │   │   └── ProcessPhotoJob.php
 │   │   ├── Services/
-│   │   │   ├── PhotoProcessorClient.php
-│   │   │   └── WatermarkService.php
+│   │   │   └── PhotoProcessorClient.php
 │   │   ├── Livewire/
 │   │   │   └── PhotoProcessor.php
 │   │   ├── Http/Controllers/
@@ -45,16 +44,16 @@ photo-processor/
 │   ├── routes/web.php
 │   └── Dockerfile
 ├── processor/
-│   ├── main.py                                   ← оновити: Form params
-│   ├── processor.py                              ← оновити: width_mm/height_mm/dpi
-│   ├── requirements.txt                          ← додати pytest pytest-mock
-│   └── tests/test_processor.py                  ← новий
-└── docker-compose.yml                            ← оновити: +app +worker +redis
+│   ├── main.py                                   ← update: Form params
+│   ├── processor.py                              ← update: width_mm/height_mm/dpi
+│   ├── requirements.txt                          ← add pytest pytest-mock
+│   └── tests/test_processor.py                  ← new
+└── docker-compose.yml                            ← update: +app +worker +redis
 ```
 
 ---
 
-## Task 1: FastAPI — параметризований endpoint
+## Task 1: FastAPI — parametrized endpoint
 
 **Files:**
 - Modify: `processor/processor.py`
@@ -63,7 +62,7 @@ photo-processor/
 - Create: `processor/tests/__init__.py`
 - Create: `processor/tests/test_processor.py`
 
-- [ ] **Step 1: Додати pytest до requirements**
+- [ ] **Step 1: Add pytest to requirements**
 
 ```
 # processor/requirements.txt
@@ -77,11 +76,11 @@ pytest
 pytest-mock
 ```
 
-- [ ] **Step 2: Написати падаючий тест**
+- [ ] **Step 2: Write failing tests**
 
 ```python
 # processor/tests/__init__.py
-# (порожній файл)
+# (empty file)
 ```
 
 ```python
@@ -129,13 +128,13 @@ def test_process_photo_square_format(mock_face, mock_bg):
     img = Image.open(io.BytesIO(result))
     w, h = img.size
 
-    assert w == h  # квадратний (USA Visa)
+    assert w == h  # square (US Visa)
 
 
 @patch("processor.remove_background")
 @patch("processor.detect_face")
 def test_process_photo_default_params(mock_face, mock_bg):
-    """Без параметрів — 35×45мм 300dpi (паспорт UA)."""
+    """Without params — 35×45mm 300dpi (UA passport)."""
     mock_face.return_value = None
 
     def passthrough(img):
@@ -149,7 +148,7 @@ def test_process_photo_default_params(mock_face, mock_bg):
     assert img.size == (int(35 / 25.4 * 300), int(45 / 25.4 * 300))
 ```
 
-- [ ] **Step 3: Запустити — переконатись що тест падає**
+- [ ] **Step 3: Run tests — confirm they fail**
 
 ```bash
 cd /Users/ernestbehinov/Work/photo-processor/processor
@@ -157,11 +156,11 @@ pip install pytest pytest-mock
 pytest tests/ -v
 ```
 
-Очікуємо: `FAILED` — `process_photo() takes 1 positional argument but 4 were given`
+Expected: `FAILED` — `process_photo() takes 1 positional argument but 4 were given`
 
-- [ ] **Step 4: Оновити `processor.py`**
+- [ ] **Step 4: Update `processor.py`**
 
-Замінити весь файл:
+Replace entire file:
 
 ```python
 # processor/processor.py
@@ -180,7 +179,7 @@ _face_detection = mp.solutions.face_detection.FaceDetection(
 
 
 def detect_face(image: Image.Image) -> tuple[int, int, int, int] | None:
-    """Повертає bbox обличчя (x, y, w, h) або None."""
+    """Returns face bbox (x, y, w, h) or None."""
     rgb = np.array(image)
     results = _face_detection.process(rgb)
 
@@ -200,7 +199,7 @@ def detect_face(image: Image.Image) -> tuple[int, int, int, int] | None:
 
 
 def remove_background(image: Image.Image) -> Image.Image:
-    """Видаляє фон через rembg з alpha matting."""
+    """Removes background via rembg with alpha matting."""
     return remove(
         image,
         session=_rembg_session,
@@ -216,7 +215,7 @@ def compose_document_photo(
     face: tuple[int, int, int, int],
     doc_ratio: float = 3 / 4,
 ) -> Image.Image:
-    """Компонує документне фото з правильним кадруванням під задані пропорції."""
+    """Crops document photo with correct framing for given proportions."""
     face_x, face_y, face_w, face_h = face
     img_w, img_h = image.size
 
@@ -250,7 +249,7 @@ def compose_document_photo(
 
 
 def add_white_background(image: Image.Image) -> Image.Image:
-    """Додає білий фон до RGBA зображення."""
+    """Adds white background to RGBA image."""
     if image.mode != "RGBA":
         return image
     background = Image.new("RGBA", image.size, (255, 255, 255, 255))
@@ -264,7 +263,7 @@ def process_photo(
     height_mm: int = 45,
     dpi: int = 300,
 ) -> bytes:
-    """Повний пайплайн: видаляє фон, кадрує, масштабує до потрібного розміру."""
+    """Full pipeline: removes background, crops, scales to target size."""
     width_px = int(width_mm / 25.4 * dpi)
     height_px = int(height_mm / 25.4 * dpi)
     doc_ratio = width_mm / height_mm
@@ -287,7 +286,7 @@ def process_photo(
     return output.getvalue()
 ```
 
-- [ ] **Step 5: Оновити `main.py`**
+- [ ] **Step 5: Update `main.py`**
 
 ```python
 # processor/main.py
@@ -306,20 +305,20 @@ async def process(
     height_mm: int = Form(45),
     dpi: int = Form(300),
 ):
-    """Обробляє фото: видаляє фон, кадрує, повертає PNG потрібного розміру."""
+    """Processes photo: removes background, crops, returns PNG of requested size."""
     image_bytes = await photo.read()
     result = process_photo(image_bytes, width_mm, height_mm, dpi)
     return Response(content=result, media_type="image/png")
 ```
 
-- [ ] **Step 6: Запустити тести — переконатись що проходять**
+- [ ] **Step 6: Run tests — confirm they pass**
 
 ```bash
 cd /Users/ernestbehinov/Work/photo-processor/processor
 pytest tests/ -v
 ```
 
-Очікуємо: `3 passed`
+Expected: `3 passed`
 
 - [ ] **Step 7: Commit**
 
@@ -339,14 +338,14 @@ git commit -m "feat(processor): parametrize endpoint with width_mm/height_mm/dpi
 - Create: `app/docker/nginx.conf`
 - Modify: `docker-compose.yml`
 
-- [ ] **Step 1: Створити Laravel проект**
+- [ ] **Step 1: Create Laravel project**
 
 ```bash
 cd /Users/ernestbehinov/Work/photo-processor
 composer create-project laravel/laravel app --prefer-dist
 ```
 
-- [ ] **Step 2: Встановити залежності**
+- [ ] **Step 2: Install dependencies**
 
 ```bash
 cd app
@@ -355,29 +354,29 @@ composer require --dev pestphp/pest:"^3.0" pestphp/pest-plugin-laravel:"^3.0"
 ./vendor/bin/pest --init
 ```
 
-- [ ] **Step 3: Встановити Filament panel**
+- [ ] **Step 3: Install Filament panel**
 
 ```bash
 php artisan filament:install --panels
 ```
 
-Коли запитає ім'я панелі — ввести `admin`.
+When asked for panel name — enter `admin`.
 
-- [ ] **Step 4: Налаштувати `.env` для SQLite + Redis**
+- [ ] **Step 4: Configure `.env` for SQLite + Redis**
 
 ```bash
 cp .env.example .env
 php artisan key:generate
 ```
 
-Відкрити `app/.env` і замінити секцію DB + Redis:
+Open `app/.env` and replace the DB + Redis section:
 
 ```dotenv
 APP_NAME="Photo Processor"
 APP_URL=http://localhost
 
 DB_CONNECTION=sqlite
-# DB_HOST та інші рядки для mysql — прибрати або залишити закоментованими
+# DB_HOST and other mysql lines — remove or leave commented
 
 QUEUE_CONNECTION=redis
 
@@ -388,16 +387,16 @@ REDIS_PORT=6379
 PROCESSOR_URL=http://processor:8000
 ```
 
-- [ ] **Step 5: Перевірити що SQLite база створюється**
+- [ ] **Step 5: Verify SQLite database is created**
 
 ```bash
 touch database/database.sqlite
 php artisan migrate
 ```
 
-Очікуємо: `INFO  Running migrations.` без помилок.
+Expected: `INFO  Running migrations.` without errors.
 
-- [ ] **Step 6: Створити `app/Dockerfile`**
+- [ ] **Step 6: Create `app/Dockerfile`**
 
 ```dockerfile
 # app/Dockerfile
@@ -438,7 +437,7 @@ EXPOSE 80
 CMD ["sh", "-c", "php-fpm -D && nginx -g 'daemon off;'"]
 ```
 
-- [ ] **Step 7: Створити nginx конфіг**
+- [ ] **Step 7: Create nginx config**
 
 ```bash
 mkdir -p app/docker
@@ -478,7 +477,7 @@ http {
 }
 ```
 
-- [ ] **Step 8: Оновити `docker-compose.yml`**
+- [ ] **Step 8: Update `docker-compose.yml`**
 
 ```yaml
 # docker-compose.yml
@@ -561,7 +560,7 @@ git commit -m "feat: add Laravel app scaffolding + Docker Compose setup"
 - Create: `app/tests/Unit/Models/DocumentFormatTest.php`
 - Create: `app/tests/Unit/Models/PhotoOrderTest.php`
 
-- [ ] **Step 1: Написати тести для моделей (падаючі)**
+- [ ] **Step 1: Write failing model tests**
 
 ```php
 <?php
@@ -617,38 +616,24 @@ it('scope expired returns only expired orders', function () {
 
     expect(PhotoOrder::expired()->count())->toBe(1);
 });
-
-it('isPaid returns true only when paid_at is set', function () {
-    $format = DocumentFormat::factory()->create();
-    $order = PhotoOrder::factory()->create([
-        'document_format_id' => $format->id,
-        'paid_at' => null,
-    ]);
-
-    expect($order->isPaid())->toBeFalse();
-
-    $order->update(['paid_at' => now()]);
-
-    expect($order->fresh()->isPaid())->toBeTrue();
-});
 ```
 
-- [ ] **Step 2: Запустити тести — переконатись що падають**
+- [ ] **Step 2: Run tests — confirm they fail**
 
 ```bash
 cd /Users/ernestbehinov/Work/photo-processor/app
 php artisan test tests/Unit/Models/ --pest
 ```
 
-Очікуємо: `FAILED` — `Class "App\Models\DocumentFormat" not found`
+Expected: `FAILED` — `Class "App\Models\DocumentFormat" not found`
 
-- [ ] **Step 3: Створити міграцію document_formats**
+- [ ] **Step 3: Create document_formats migration**
 
 ```bash
 php artisan make:migration create_document_formats_table
 ```
 
-Відкрити створений файл (`database/migrations/xxxx_create_document_formats_table.php`) і замінити метод `up`:
+Open the created file (`database/migrations/xxxx_create_document_formats_table.php`) and replace the `up` method:
 
 ```php
 public function up(): void
@@ -672,7 +657,7 @@ public function down(): void
 }
 ```
 
-- [ ] **Step 4: Створити міграцію photo_orders**
+- [ ] **Step 4: Create photo_orders migration**
 
 ```bash
 php artisan make:migration create_photo_orders_table
@@ -686,10 +671,8 @@ public function up(): void
         $table->uuid('uuid')->unique();
         $table->foreignId('document_format_id')->constrained('document_formats');
         $table->string('original_path');
-        $table->string('result_watermark_path')->nullable();
         $table->string('result_clean_path')->nullable();
         $table->enum('status', ['pending', 'processing', 'completed', 'failed'])->default('pending');
-        $table->timestamp('paid_at')->nullable();
         $table->timestamp('expires_at');
         $table->timestamps();
     });
@@ -701,7 +684,7 @@ public function down(): void
 }
 ```
 
-- [ ] **Step 5: Створити модель DocumentFormat**
+- [ ] **Step 5: Create DocumentFormat model**
 
 ```php
 <?php
@@ -730,7 +713,7 @@ class DocumentFormat extends Model
 }
 ```
 
-- [ ] **Step 6: Створити модель PhotoOrder**
+- [ ] **Step 6: Create PhotoOrder model**
 
 ```php
 <?php
@@ -750,12 +733,10 @@ class PhotoOrder extends Model
 
     protected $fillable = [
         'uuid', 'document_format_id', 'original_path',
-        'result_watermark_path', 'result_clean_path',
-        'status', 'paid_at', 'expires_at',
+        'result_clean_path', 'status', 'expires_at',
     ];
 
     protected $casts = [
-        'paid_at'    => 'datetime',
         'expires_at' => 'datetime',
     ];
 
@@ -772,11 +753,6 @@ class PhotoOrder extends Model
         return $this->belongsTo(DocumentFormat::class);
     }
 
-    public function isPaid(): bool
-    {
-        return $this->paid_at !== null;
-    }
-
     public function scopeExpired(Builder $query): Builder
     {
         return $query->where('expires_at', '<', now());
@@ -784,7 +760,7 @@ class PhotoOrder extends Model
 }
 ```
 
-- [ ] **Step 7: Створити factories**
+- [ ] **Step 7: Create factories**
 
 ```bash
 php artisan make:factory DocumentFormatFactory --model=DocumentFormat
@@ -841,14 +817,14 @@ class PhotoOrderFactory extends Factory
 }
 ```
 
-- [ ] **Step 8: Запустити міграцію та тести**
+- [ ] **Step 8: Run migration and tests**
 
 ```bash
 php artisan migrate
 php artisan test tests/Unit/Models/ --pest
 ```
 
-Очікуємо: `3 passed`
+Expected: `2 passed`
 
 - [ ] **Step 9: Commit**
 
@@ -865,7 +841,7 @@ git commit -m "feat: add DocumentFormat and PhotoOrder models with migrations"
 - Create: `app/app/Services/PhotoProcessorClient.php`
 - Create: `app/tests/Unit/Services/PhotoProcessorClientTest.php`
 
-- [ ] **Step 1: Написати падаючий тест**
+- [ ] **Step 1: Write failing tests**
 
 ```php
 <?php
@@ -906,11 +882,11 @@ it('throws RuntimeException when processor returns error', function () {
 });
 ```
 
-- [ ] **Step 2: Створити тестовий PNG fixture**
+- [ ] **Step 2: Create test PNG fixture**
 
 ```bash
 mkdir -p app/tests/fixtures
-# Створюємо мінімальний PNG 1x1 через PHP
+# Create minimal 1x1 PNG via PHP
 php -r "
 \$img = imagecreate(1, 1);
 imagecolorallocate(\$img, 255, 255, 255);
@@ -920,15 +896,15 @@ echo 'created';
 " 
 ```
 
-- [ ] **Step 3: Запустити — переконатись що тест падає**
+- [ ] **Step 3: Run tests — confirm they fail**
 
 ```bash
 php artisan test tests/Unit/Services/PhotoProcessorClientTest.php --pest
 ```
 
-Очікуємо: `FAILED` — `Class "App\Services\PhotoProcessorClient" not found`
+Expected: `FAILED` — `Class "App\Services\PhotoProcessorClient" not found`
 
-- [ ] **Step 4: Реалізувати PhotoProcessorClient**
+- [ ] **Step 4: Implement PhotoProcessorClient**
 
 ```php
 <?php
@@ -962,9 +938,9 @@ class PhotoProcessorClient
 }
 ```
 
-- [ ] **Step 5: Зареєструвати в сервіс-провайдері**
+- [ ] **Step 5: Register in service provider**
 
-Відкрити `app/Providers/AppServiceProvider.php` і додати в метод `register`:
+Open `app/Providers/AppServiceProvider.php` and add to `register`:
 
 ```php
 use App\Services\PhotoProcessorClient;
@@ -977,7 +953,7 @@ public function register(): void
 }
 ```
 
-Додати в `app/config/services.php`:
+Add to `app/config/services.php`:
 
 ```php
 'processor' => [
@@ -985,13 +961,13 @@ public function register(): void
 ],
 ```
 
-- [ ] **Step 6: Запустити тести**
+- [ ] **Step 6: Run tests**
 
 ```bash
 php artisan test tests/Unit/Services/PhotoProcessorClientTest.php --pest
 ```
 
-Очікуємо: `2 passed`
+Expected: `2 passed`
 
 - [ ] **Step 7: Commit**
 
@@ -1002,152 +978,13 @@ git commit -m "feat: add PhotoProcessorClient with HTTP facade integration"
 
 ---
 
-## Task 5: WatermarkService
-
-**Files:**
-- Create: `app/app/Services/WatermarkService.php`
-- Create: `app/tests/Unit/Services/WatermarkServiceTest.php`
-
-- [ ] **Step 1: Написати падаючий тест**
-
-```php
-<?php
-// app/tests/Unit/Services/WatermarkServiceTest.php
-
-use App\Services\WatermarkService;
-
-function make_test_png(int $width = 200, int $height = 250): string
-{
-    $img = imagecreatetruecolor($width, $height);
-    $white = imagecolorallocate($img, 255, 255, 255);
-    imagefill($img, 0, 0, $white);
-    ob_start();
-    imagepng($img);
-    $bytes = ob_get_clean();
-    imagedestroy($img);
-    return $bytes;
-}
-
-it('returns PNG bytes', function () {
-    $service = new WatermarkService();
-    $result = $service->apply(make_test_png());
-
-    expect($result)->toBeString()->not->toBeEmpty();
-
-    $info = getimagesizefromstring($result);
-    expect($info['mime'])->toBe('image/png');
-});
-
-it('preserves original image dimensions', function () {
-    $service = new WatermarkService();
-    $original = make_test_png(413, 531);
-    $result = $service->apply($original);
-
-    [$origW, $origH] = getimagesizefromstring($original);
-    [$resW, $resH] = getimagesizefromstring($result);
-
-    expect($resW)->toBe($origW)
-        ->and($resH)->toBe($origH);
-});
-
-it('throws RuntimeException for invalid bytes', function () {
-    $service = new WatermarkService();
-
-    expect(fn () => $service->apply('not-an-image'))
-        ->toThrow(\RuntimeException::class);
-});
-```
-
-- [ ] **Step 2: Запустити — переконатись що падає**
-
-```bash
-php artisan test tests/Unit/Services/WatermarkServiceTest.php --pest
-```
-
-Очікуємо: `FAILED` — `Class "App\Services\WatermarkService" not found`
-
-- [ ] **Step 3: Реалізувати WatermarkService**
-
-```php
-<?php
-// app/app/Services/WatermarkService.php
-
-namespace App\Services;
-
-class WatermarkService
-{
-    private string $fontPath;
-
-    public function __construct()
-    {
-        // ttf-dejavu встановлений в Dockerfile; для локальної розробки — override через env
-        $this->fontPath = env(
-            'DEJAVU_FONT_PATH',
-            '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
-        );
-    }
-
-    public function apply(string $imageBytes): string
-    {
-        $image = imagecreatefromstring($imageBytes);
-        if ($image === false) {
-            throw new \RuntimeException('Cannot create image from provided bytes');
-        }
-
-        $width  = imagesx($image);
-        $height = imagesy($image);
-
-        // Напівпрозорий сірий колір (alpha 0=опакий, 127=повністю прозорий)
-        $textColor = imagecolorallocatealpha($image, 100, 100, 100, 55);
-
-        $fontSize = (int) max(20, min($width, $height) / 6);
-        $step     = (int) max(80, min($width, $height) / 2);
-        $angle    = -45;
-
-        // Малюємо "PREVIEW" по діагоналі кілька разів щоб покрити все зображення
-        for ($y = -$width; $y <= $height + $width; $y += $step) {
-            if (file_exists($this->fontPath)) {
-                imagettftext($image, $fontSize, $angle, 0, $y, $textColor, $this->fontPath, 'PREVIEW');
-            } else {
-                // fallback: вбудований шрифт (без повороту)
-                imagestring($image, 5, (int) ($width * 0.1), $y, 'PREVIEW', $textColor);
-            }
-        }
-
-        ob_start();
-        imagepng($image);
-        $result = ob_get_clean();
-        imagedestroy($image);
-
-        return $result;
-    }
-}
-```
-
-- [ ] **Step 4: Запустити тести**
-
-```bash
-php artisan test tests/Unit/Services/WatermarkServiceTest.php --pest
-```
-
-Очікуємо: `3 passed`
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add app/Services/WatermarkService.php tests/Unit/Services/WatermarkServiceTest.php
-git commit -m "feat: add WatermarkService with diagonal PREVIEW overlay via GD"
-```
-
----
-
-## Task 6: ProcessPhotoJob
+## Task 5: ProcessPhotoJob
 
 **Files:**
 - Create: `app/app/Jobs/ProcessPhotoJob.php`
 - Create: `app/tests/Unit/Jobs/ProcessPhotoJobTest.php`
 
-- [ ] **Step 1: Написати падаючий тест**
+- [ ] **Step 1: Write failing tests**
 
 ```php
 <?php
@@ -1157,14 +994,13 @@ use App\Jobs\ProcessPhotoJob;
 use App\Models\DocumentFormat;
 use App\Models\PhotoOrder;
 use App\Services\PhotoProcessorClient;
-use App\Services\WatermarkService;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     Storage::fake('local');
 });
 
-it('processes photo: sets completed status and saves clean+watermark paths', function () {
+it('processes photo: sets completed status and saves clean path', function () {
     $format = DocumentFormat::factory()->create(['width_mm' => 35, 'height_mm' => 45, 'dpi' => 300]);
     $order  = PhotoOrder::factory()->create([
         'document_format_id' => $format->id,
@@ -1174,32 +1010,23 @@ it('processes photo: sets completed status and saves clean+watermark paths', fun
 
     Storage::put('originals/test.png', 'fake-image-bytes');
 
-    $fakeCleanBytes     = file_get_contents(base_path('tests/fixtures/1x1.png'));
-    $fakeWatermarkBytes = file_get_contents(base_path('tests/fixtures/1x1.png'));
+    $fakeCleanBytes = file_get_contents(base_path('tests/fixtures/1x1.png'));
 
-    $mockClient    = Mockery::mock(PhotoProcessorClient::class);
-    $mockWatermark = Mockery::mock(WatermarkService::class);
+    $mockClient = Mockery::mock(PhotoProcessorClient::class);
 
     $mockClient->shouldReceive('process')
         ->once()
         ->with('fake-image-bytes', 35, 45, 300)
         ->andReturn($fakeCleanBytes);
 
-    $mockWatermark->shouldReceive('apply')
-        ->once()
-        ->with($fakeCleanBytes)
-        ->andReturn($fakeWatermarkBytes);
-
     $job = new ProcessPhotoJob($order);
-    $job->handle($mockClient, $mockWatermark);
+    $job->handle($mockClient);
 
     $order->refresh();
     expect($order->status)->toBe('completed')
-        ->and($order->result_clean_path)->toBe("results/{$order->uuid}_clean.png")
-        ->and($order->result_watermark_path)->toBe("results/{$order->uuid}_watermark.png");
+        ->and($order->result_clean_path)->toBe("results/{$order->uuid}_clean.png");
 
     Storage::assertExists("results/{$order->uuid}_clean.png");
-    Storage::assertExists("results/{$order->uuid}_watermark.png");
 });
 
 it('sets status failed when processor throws', function () {
@@ -1211,35 +1038,34 @@ it('sets status failed when processor throws', function () {
 
     Storage::put('originals/test.png', 'bytes');
 
-    $mockClient    = Mockery::mock(PhotoProcessorClient::class);
-    $mockWatermark = Mockery::mock(WatermarkService::class);
+    $mockClient = Mockery::mock(PhotoProcessorClient::class);
 
     $mockClient->shouldReceive('process')->andThrow(new \RuntimeException('Processor down'));
 
     $job = new ProcessPhotoJob($order);
 
-    expect(fn () => $job->handle($mockClient, $mockWatermark))
+    expect(fn () => $job->handle($mockClient))
         ->toThrow(\RuntimeException::class);
 
     expect($order->fresh()->status)->toBe('failed');
 });
 ```
 
-- [ ] **Step 2: Запустити — переконатись що падає**
+- [ ] **Step 2: Run tests — confirm they fail**
 
 ```bash
 php artisan test tests/Unit/Jobs/ --pest
 ```
 
-Очікуємо: `FAILED` — `Class "App\Jobs\ProcessPhotoJob" not found`
+Expected: `FAILED` — `Class "App\Jobs\ProcessPhotoJob" not found`
 
-- [ ] **Step 3: Створити ProcessPhotoJob**
+- [ ] **Step 3: Create ProcessPhotoJob**
 
 ```bash
 php artisan make:job ProcessPhotoJob
 ```
 
-Замінити зміст файла:
+Replace file content:
 
 ```php
 <?php
@@ -1249,7 +1075,6 @@ namespace App\Jobs;
 
 use App\Models\PhotoOrder;
 use App\Services\PhotoProcessorClient;
-use App\Services\WatermarkService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -1266,7 +1091,7 @@ class ProcessPhotoJob implements ShouldQueue
 
     public function __construct(public readonly PhotoOrder $order) {}
 
-    public function handle(PhotoProcessorClient $client, WatermarkService $watermark): void
+    public function handle(PhotoProcessorClient $client): void
     {
         $this->order->update(['status' => 'processing']);
 
@@ -1284,14 +1109,9 @@ class ProcessPhotoJob implements ShouldQueue
             $cleanPath = "results/{$this->order->uuid}_clean.png";
             Storage::put($cleanPath, $cleanBytes);
 
-            $watermarkBytes = $watermark->apply($cleanBytes);
-            $watermarkPath  = "results/{$this->order->uuid}_watermark.png";
-            Storage::put($watermarkPath, $watermarkBytes);
-
             $this->order->update([
-                'status'                => 'completed',
-                'result_clean_path'     => $cleanPath,
-                'result_watermark_path' => $watermarkPath,
+                'status'            => 'completed',
+                'result_clean_path' => $cleanPath,
             ]);
         } catch (\Throwable $e) {
             $this->order->update(['status' => 'failed']);
@@ -1301,31 +1121,31 @@ class ProcessPhotoJob implements ShouldQueue
 }
 ```
 
-- [ ] **Step 4: Запустити тести**
+- [ ] **Step 4: Run tests**
 
 ```bash
 php artisan test tests/Unit/Jobs/ --pest
 ```
 
-Очікуємо: `2 passed`
+Expected: `2 passed`
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add app/Jobs/ProcessPhotoJob.php tests/Unit/Jobs/
-git commit -m "feat: add ProcessPhotoJob with clean+watermark storage"
+git commit -m "feat: add ProcessPhotoJob with clean result storage"
 ```
 
 ---
 
-## Task 7: Livewire PhotoProcessor component
+## Task 6: Livewire PhotoProcessor component
 
 **Files:**
 - Create: `app/app/Livewire/PhotoProcessor.php`
 - Create: `app/resources/views/livewire/photo-processor.blade.php`
 - Create: `app/tests/Feature/Livewire/PhotoProcessorTest.php`
 
-- [ ] **Step 1: Написати падаючі тести**
+- [ ] **Step 1: Write failing tests**
 
 ```php
 <?php
@@ -1346,10 +1166,10 @@ beforeEach(function () {
 });
 
 it('renders step 1 with document formats', function () {
-    DocumentFormat::factory()->create(['name' => 'Паспорт UA', 'is_active' => true]);
+    DocumentFormat::factory()->create(['name' => 'UA Passport', 'is_active' => true]);
 
     Livewire::test(PhotoProcessor::class)
-        ->assertSee('Паспорт UA')
+        ->assertSee('UA Passport')
         ->assertSet('step', 1);
 });
 
@@ -1404,33 +1224,17 @@ it('checkStatus moves nothing until completed', function () {
         ->call('checkStatus')
         ->assertSet('step', 2);
 });
-
-it('pay marks order as paid and redirects to download', function () {
-    $format = DocumentFormat::factory()->create();
-    $order  = PhotoOrder::factory()->create([
-        'document_format_id' => $format->id,
-        'status'             => 'completed',
-    ]);
-
-    Livewire::test(PhotoProcessor::class)
-        ->set('step', 2)
-        ->set('orderUuid', $order->uuid)
-        ->call('pay')
-        ->assertRedirect(route('download', $order->uuid));
-
-    expect($order->fresh()->isPaid())->toBeTrue();
-});
 ```
 
-- [ ] **Step 2: Запустити — переконатись що падають**
+- [ ] **Step 2: Run tests — confirm they fail**
 
 ```bash
 php artisan test tests/Feature/Livewire/ --pest
 ```
 
-Очікуємо: `FAILED` — `Class "App\Livewire\PhotoProcessor" not found`
+Expected: `FAILED` — `Class "App\Livewire\PhotoProcessor" not found`
 
-- [ ] **Step 3: Реалізувати Livewire компонент**
+- [ ] **Step 3: Implement Livewire component**
 
 ```php
 <?php
@@ -1487,16 +1291,9 @@ class PhotoProcessor extends Component
         $order = PhotoOrder::where('uuid', $this->orderUuid)->firstOrFail();
 
         if (in_array($order->status, ['completed', 'failed'])) {
-            // Компонент залишається на step 2; шаблон показує різний UI залежно від status
+            // Component stays on step 2; template shows different UI based on status
             $this->dispatch('status-updated');
         }
-    }
-
-    public function pay(): void
-    {
-        $order = PhotoOrder::where('uuid', $this->orderUuid)->firstOrFail();
-        $order->update(['paid_at' => now()]);
-        $this->redirect(route('download', $order->uuid));
     }
 
     public function render(): \Illuminate\View\View
@@ -1511,38 +1308,38 @@ class PhotoProcessor extends Component
 }
 ```
 
-- [ ] **Step 4: Запустити тести**
+- [ ] **Step 4: Run tests**
 
 ```bash
 php artisan test tests/Feature/Livewire/ --pest
 ```
 
-Очікуємо: `6 passed`
+Expected: `5 passed`
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add app/Livewire/PhotoProcessor.php tests/Feature/Livewire/
-git commit -m "feat: add PhotoProcessor Livewire component with 3-step flow"
+git commit -m "feat: add PhotoProcessor Livewire component with 2-step flow"
 ```
 
 ---
 
-## Task 8: Blade views + layout
+## Task 7: Blade views + layout
 
 **Files:**
 - Create: `app/resources/views/layouts/app.blade.php`
 - Create: `app/resources/views/livewire/photo-processor.blade.php`
 - Create: `app/routes/web.php`
 
-> Мінімальний адаптивний UI без CSS-фреймворку. Tailwind CSS доступний через CDN.
+> Minimal responsive UI without a CSS framework. Tailwind CSS available via CDN.
 
-- [ ] **Step 1: Створити базовий layout**
+- [ ] **Step 1: Create base layout**
 
 ```html
 {{-- app/resources/views/layouts/app.blade.php --}}
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1552,32 +1349,32 @@ git commit -m "feat: add PhotoProcessor Livewire component with 3-step flow"
 </head>
 <body class="bg-gray-50 min-h-screen">
     <header class="bg-white border-b px-6 py-4">
-        <a href="/" class="text-xl font-semibold text-gray-800">📷 Фото на документи</a>
+        <a href="/" class="text-xl font-semibold text-gray-800">📷 Document Photos</a>
     </header>
     <main class="max-w-2xl mx-auto py-10 px-4">
         @yield('content')
     </main>
     <footer class="text-center text-sm text-gray-400 py-6">
-        <a href="{{ route('privacy-policy') }}" class="underline">Політика конфіденційності</a>
+        <a href="{{ route('privacy-policy') }}" class="underline">Privacy Policy</a>
     </footer>
     @livewireScripts
 </body>
 </html>
 ```
 
-- [ ] **Step 2: Створити Livewire view**
+- [ ] **Step 2: Create Livewire view**
 
 ```html
 {{-- app/resources/views/livewire/photo-processor.blade.php --}}
 <div>
-    {{-- КРОК 1: Upload + вибір формату --}}
+    {{-- STEP 1: Upload + format selection --}}
     @if ($step === 1)
-        <h1 class="text-2xl font-bold mb-6">Завантажте фото</h1>
+        <h1 class="text-2xl font-bold mb-6">Upload your photo</h1>
 
         <form wire:submit="submit" class="space-y-6">
-            {{-- Завантаження фото --}}
+            {{-- Photo upload --}}
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Фото</label>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Photo</label>
                 <input type="file" wire:model="photo" accept="image/*"
                        class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4
                               file:border-0 file:text-sm file:font-semibold
@@ -1585,17 +1382,17 @@ git commit -m "feat: add PhotoProcessor Livewire component with 3-step flow"
                 @error('photo') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
             </div>
 
-            {{-- Вибір формату --}}
+            {{-- Format selection --}}
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Формат документа</label>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Document Format</label>
                 <select wire:model="documentFormatId"
                         class="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">— Оберіть формат —</option>
+                    <option value="">— Select format —</option>
                     @foreach ($formats as $country => $countryFormats)
                         <optgroup label="{{ $country }}">
                             @foreach ($countryFormats as $format)
                                 <option value="{{ $format->id }}">
-                                    {{ $format->name }} ({{ $format->width_mm }}×{{ $format->height_mm }}мм)
+                                    {{ $format->name }} ({{ $format->width_mm }}×{{ $format->height_mm }}mm)
                                 </option>
                             @endforeach
                         </optgroup>
@@ -1608,9 +1405,9 @@ git commit -m "feat: add PhotoProcessor Livewire component with 3-step flow"
             <div class="flex items-start gap-2">
                 <input type="checkbox" wire:model="privacyAccepted" id="privacy" class="mt-1">
                 <label for="privacy" class="text-sm text-gray-600">
-                    Я погоджуюся з
+                    I agree to the
                     <a href="{{ route('privacy-policy') }}" target="_blank" class="text-blue-600 underline">
-                        Політикою конфіденційності
+                        Privacy Policy
                     </a>
                 </label>
             </div>
@@ -1618,47 +1415,46 @@ git commit -m "feat: add PhotoProcessor Livewire component with 3-step flow"
 
             <button type="submit"
                     class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition">
-                <span wire:loading.remove>Обробити фото</span>
-                <span wire:loading>Завантаження…</span>
+                <span wire:loading.remove>Process Photo</span>
+                <span wire:loading>Uploading…</span>
             </button>
         </form>
     @endif
 
-    {{-- КРОК 2: Очікування + прев'ю --}}
+    {{-- STEP 2: Processing + result --}}
     @if ($step === 2)
-        <h1 class="text-2xl font-bold mb-6">Ваше фото</h1>
+        <h1 class="text-2xl font-bold mb-6">Your Photo</h1>
 
         @if (!$order || in_array($order->status, ['pending', 'processing']))
-            {{-- Спінер під час обробки --}}
+            {{-- Spinner while processing --}}
             <div wire:poll.2000ms="checkStatus" class="text-center py-12">
                 <div class="inline-block w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p class="text-gray-600">Обробляємо фото, зачекайте…</p>
+                <p class="text-gray-600">Processing your photo, please wait…</p>
             </div>
         @elseif ($order->status === 'failed')
             <div class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-                <p class="text-red-700 font-semibold">Не вдалось обробити фото</p>
-                <p class="text-red-600 text-sm mt-1">Спробуйте інше фото з чітким обличчям</p>
+                <p class="text-red-700 font-semibold">Failed to process photo</p>
+                <p class="text-red-600 text-sm mt-1">Please try another photo with a clear face</p>
                 <button wire:click="$set('step', 1)" class="mt-4 text-blue-600 underline text-sm">
-                    Спробувати знову
+                    Try again
                 </button>
             </div>
         @elseif ($order->status === 'completed')
-            {{-- Прев'ю з watermark --}}
+            {{-- Result with free download --}}
             <div class="space-y-6">
                 <div class="border rounded-lg overflow-hidden">
-                    <img src="{{ route('preview', $order->uuid) }}" alt="Прев'ю фото"
+                    <img src="{{ route('preview', $order->uuid) }}" alt="Photo preview"
                          class="w-full max-w-xs mx-auto block">
                 </div>
                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-                    <p class="text-gray-800 font-semibold mb-1">Фото готове!</p>
+                    <p class="text-gray-800 font-semibold mb-1">Photo ready!</p>
                     <p class="text-gray-600 text-sm mb-4">
-                        Завантажте версію без водяного знаку
+                        Download your photo for free
                     </p>
-                    <button wire:click="pay"
-                            class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition">
-                        <span wire:loading.remove wire:target="pay">Завантажити без watermark — безкоштовно</span>
-                        <span wire:loading wire:target="pay">Обробка…</span>
-                    </button>
+                    <a href="{{ route('download', $order->uuid) }}"
+                       class="inline-block bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition">
+                        Download Free
+                    </a>
                 </div>
             </div>
         @endif
@@ -1666,7 +1462,7 @@ git commit -m "feat: add PhotoProcessor Livewire component with 3-step flow"
 </div>
 ```
 
-- [ ] **Step 3: Оновити routes/web.php**
+- [ ] **Step 3: Update routes/web.php**
 
 ```php
 <?php
@@ -1678,18 +1474,17 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', PhotoProcessor::class)->name('home');
 Route::get('/preview/{uuid}', [PhotoController::class, 'preview'])->name('preview');
-Route::get('/result/{uuid}', [PhotoController::class, 'result'])->name('result');
 Route::get('/download/{uuid}', [PhotoController::class, 'download'])->name('download');
 Route::view('/privacy-policy', 'pages.privacy-policy')->name('privacy-policy');
 ```
 
-- [ ] **Step 4: Перевірити що layout + маршрут `/` рендерить без помилок**
+- [ ] **Step 4: Verify layout and routes render without errors**
 
 ```bash
 php artisan route:list
 ```
 
-Очікуємо: рядки з `/`, `/preview/{uuid}`, `/result/{uuid}`, `/download/{uuid}`, `/privacy-policy`
+Expected: rows for `/`, `/preview/{uuid}`, `/download/{uuid}`, `/privacy-policy`
 
 - [ ] **Step 5: Commit**
 
@@ -1700,13 +1495,13 @@ git commit -m "feat: add Blade views and routes for photo processor flow"
 
 ---
 
-## Task 9: PhotoController
+## Task 8: PhotoController
 
 **Files:**
 - Create: `app/app/Http/Controllers/PhotoController.php`
 - Create: `app/tests/Feature/Http/PhotoControllerTest.php`
 
-- [ ] **Step 1: Написати падаючі тести**
+- [ ] **Step 1: Write failing tests**
 
 ```php
 <?php
@@ -1720,15 +1515,15 @@ beforeEach(function () {
     Storage::fake('local');
 });
 
-it('preview returns watermark image for valid uuid', function () {
+it('preview returns clean image for valid uuid', function () {
     $format = DocumentFormat::factory()->create();
     $order  = PhotoOrder::factory()->create([
-        'document_format_id'   => $format->id,
-        'status'               => 'completed',
-        'result_watermark_path' => 'results/test_watermark.png',
-        'expires_at'           => now()->addHours(24),
+        'document_format_id' => $format->id,
+        'status'             => 'completed',
+        'result_clean_path'  => 'results/test_clean.png',
+        'expires_at'         => now()->addHours(24),
     ]);
-    Storage::put('results/test_watermark.png', file_get_contents(base_path('tests/fixtures/1x1.png')));
+    Storage::put('results/test_clean.png', file_get_contents(base_path('tests/fixtures/1x1.png')));
 
     $this->get(route('preview', $order->uuid))
         ->assertOk()
@@ -1745,13 +1540,12 @@ it('preview returns 404 for expired order', function () {
     $this->get(route('preview', $order->uuid))->assertNotFound();
 });
 
-it('download returns clean image when order is paid', function () {
+it('download returns clean image for completed order', function () {
     $format = DocumentFormat::factory()->create();
     $order  = PhotoOrder::factory()->create([
         'document_format_id' => $format->id,
         'status'             => 'completed',
         'result_clean_path'  => 'results/test_clean.png',
-        'paid_at'            => now(),
         'expires_at'         => now()->addHours(24),
     ]);
     Storage::put('results/test_clean.png', file_get_contents(base_path('tests/fixtures/1x1.png')));
@@ -1760,29 +1554,17 @@ it('download returns clean image when order is paid', function () {
         ->assertOk()
         ->assertDownload('photo.png');
 });
-
-it('download returns 404 when order not paid', function () {
-    $format = DocumentFormat::factory()->create();
-    $order  = PhotoOrder::factory()->create([
-        'document_format_id' => $format->id,
-        'status'             => 'completed',
-        'paid_at'            => null,
-        'expires_at'         => now()->addHours(24),
-    ]);
-
-    $this->get(route('download', $order->uuid))->assertNotFound();
-});
 ```
 
-- [ ] **Step 2: Запустити — переконатись що падають**
+- [ ] **Step 2: Run tests — confirm they fail**
 
 ```bash
 php artisan test tests/Feature/Http/ --pest
 ```
 
-Очікуємо: `FAILED` — `Class "App\Http\Controllers\PhotoController" not found` або `Route [preview] not defined`
+Expected: `FAILED` — `Class "App\Http\Controllers\PhotoController" not found` or `Route [preview] not defined`
 
-- [ ] **Step 3: Реалізувати PhotoController**
+- [ ] **Step 3: Implement PhotoController**
 
 ```php
 <?php
@@ -1800,28 +1582,18 @@ class PhotoController extends Controller
     {
         $order = PhotoOrder::where('uuid', $uuid)
             ->where('expires_at', '>', now())
-            ->whereNotNull('result_watermark_path')
+            ->whereNotNull('result_clean_path')
             ->firstOrFail();
 
-        $bytes = Storage::get($order->result_watermark_path);
+        $bytes = Storage::get($order->result_clean_path);
 
         return response($bytes, 200, ['Content-Type' => 'image/png']);
-    }
-
-    public function result(string $uuid): \Illuminate\View\View
-    {
-        $order = PhotoOrder::where('uuid', $uuid)
-            ->where('expires_at', '>', now())
-            ->firstOrFail();
-
-        return view('pages.result', compact('order'));
     }
 
     public function download(string $uuid): StreamedResponse
     {
         $order = PhotoOrder::where('uuid', $uuid)
             ->where('expires_at', '>', now())
-            ->whereNotNull('paid_at')
             ->whereNotNull('result_clean_path')
             ->firstOrFail();
 
@@ -1830,24 +1602,24 @@ class PhotoController extends Controller
 }
 ```
 
-- [ ] **Step 4: Запустити тести**
+- [ ] **Step 4: Run tests**
 
 ```bash
 php artisan test tests/Feature/Http/ --pest
 ```
 
-Очікуємо: `4 passed`
+Expected: `3 passed`
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add app/Http/Controllers/PhotoController.php tests/Feature/Http/
-git commit -m "feat: add PhotoController for preview, result and download endpoints"
+git commit -m "feat: add PhotoController for preview and free download endpoints"
 ```
 
 ---
 
-## Task 10: Privacy Policy + CleanExpiredOrders
+## Task 9: Privacy Policy + CleanExpiredOrders
 
 **Files:**
 - Create: `app/resources/views/pages/privacy-policy.blade.php`
@@ -1855,7 +1627,7 @@ git commit -m "feat: add PhotoController for preview, result and download endpoi
 - Create: `app/tests/Feature/Console/CleanExpiredOrdersTest.php`
 - Modify: `app/bootstrap/app.php`
 
-- [ ] **Step 1: Написати падаючий тест для команди**
+- [ ] **Step 1: Write failing test for the command**
 
 ```php
 <?php
@@ -1872,19 +1644,17 @@ beforeEach(function () {
 it('deletes expired orders and their files', function () {
     $format = DocumentFormat::factory()->create();
 
-    // Прострочений order з файлами
+    // Expired order with files
     $expired = PhotoOrder::factory()->create([
-        'document_format_id'    => $format->id,
-        'original_path'         => 'originals/old.png',
-        'result_clean_path'     => 'results/old_clean.png',
-        'result_watermark_path' => 'results/old_watermark.png',
-        'expires_at'            => now()->subHour(),
+        'document_format_id' => $format->id,
+        'original_path'      => 'originals/old.png',
+        'result_clean_path'  => 'results/old_clean.png',
+        'expires_at'         => now()->subHour(),
     ]);
     Storage::put('originals/old.png', 'bytes');
     Storage::put('results/old_clean.png', 'bytes');
-    Storage::put('results/old_watermark.png', 'bytes');
 
-    // Актуальний order
+    // Active order
     $active = PhotoOrder::factory()->create([
         'document_format_id' => $format->id,
         'original_path'      => 'originals/new.png',
@@ -1899,20 +1669,19 @@ it('deletes expired orders and their files', function () {
 
     Storage::assertMissing('originals/old.png');
     Storage::assertMissing('results/old_clean.png');
-    Storage::assertMissing('results/old_watermark.png');
     Storage::assertExists('originals/new.png');
 });
 ```
 
-- [ ] **Step 2: Запустити — переконатись що тест падає**
+- [ ] **Step 2: Run tests — confirm they fail**
 
 ```bash
 php artisan test tests/Feature/Console/ --pest
 ```
 
-Очікуємо: `FAILED`
+Expected: `FAILED`
 
-- [ ] **Step 3: Створити команду CleanExpiredOrders**
+- [ ] **Step 3: Create CleanExpiredOrders command**
 
 ```bash
 php artisan make:command CleanExpiredOrders
@@ -1942,7 +1711,6 @@ class CleanExpiredOrders extends Command
                 foreach ([
                     $order->original_path,
                     $order->result_clean_path,
-                    $order->result_watermark_path,
                 ] as $path) {
                     if ($path && Storage::exists($path)) {
                         Storage::delete($path);
@@ -1959,9 +1727,9 @@ class CleanExpiredOrders extends Command
 }
 ```
 
-- [ ] **Step 4: Зареєструвати в планувальнику**
+- [ ] **Step 4: Register in scheduler**
 
-У `app/bootstrap/app.php` додати в `withSchedule` (Laravel 11+ синтаксис):
+In `app/bootstrap/app.php` add to `withSchedule` (Laravel 11+ syntax):
 
 ```php
 ->withSchedule(function (\Illuminate\Console\Scheduling\Schedule $schedule) {
@@ -1969,7 +1737,7 @@ class CleanExpiredOrders extends Command
 })
 ```
 
-- [ ] **Step 5: Створити Privacy Policy сторінку**
+- [ ] **Step 5: Create Privacy Policy page**
 
 ```html
 {{-- app/resources/views/pages/privacy-policy.blade.php --}}
@@ -1977,47 +1745,47 @@ class CleanExpiredOrders extends Command
 
 @section('content')
 <div class="prose max-w-none">
-    <h1 class="text-2xl font-bold mb-6">Політика конфіденційності</h1>
+    <h1 class="text-2xl font-bold mb-6">Privacy Policy</h1>
 
-    <h2 class="text-lg font-semibold mt-6 mb-2">Що ми збираємо</h2>
+    <h2 class="text-lg font-semibold mt-6 mb-2">What we collect</h2>
     <p class="text-gray-700 mb-4">
-        При обробці фото ми тимчасово зберігаємо: завантажене фото, результат обробки,
-        IP-адресу та технічні дані запиту (User-Agent, cookies сесії).
+        When processing photos we temporarily store: the uploaded photo, the processed result,
+        IP address, and technical request data (User-Agent, session cookies).
     </p>
 
-    <h2 class="text-lg font-semibold mt-6 mb-2">Як ми зберігаємо дані</h2>
+    <h2 class="text-lg font-semibold mt-6 mb-2">How we store data</h2>
     <p class="text-gray-700 mb-4">
-        Файли зберігаються на захищеному сервері виключно для надання послуги.
-        Доступ до файлів здійснюється через унікальне посилання.
+        Files are stored on a secure server solely to provide the service.
+        Access to files is via a unique link.
     </p>
 
-    <h2 class="text-lg font-semibold mt-6 mb-2">Термін зберігання</h2>
+    <h2 class="text-lg font-semibold mt-6 mb-2">Retention period</h2>
     <p class="text-gray-700 mb-4">
-        Всі завантажені фото та результати обробки автоматично видаляються через <strong>24 години</strong>.
+        All uploaded photos and processed results are automatically deleted after <strong>24 hours</strong>.
     </p>
 
-    <h2 class="text-lg font-semibold mt-6 mb-2">Видалення даних</h2>
+    <h2 class="text-lg font-semibold mt-6 mb-2">Data deletion</h2>
     <p class="text-gray-700 mb-4">
-        Якщо ви хочете видалити дані раніше, зв'яжіться з нами.
-        Після закінчення терміну дані видаляються автоматично.
+        If you wish to delete your data sooner, please contact us.
+        After the retention period, data is deleted automatically.
     </p>
 
     <h2 class="text-lg font-semibold mt-6 mb-2">Cookies</h2>
     <p class="text-gray-700 mb-4">
-        Ми використовуємо сесійні cookies для ідентифікації замовлення.
-        Cookies видаляються при закритті браузера або після 24 годин.
+        We use session cookies to identify orders.
+        Cookies are deleted when the browser is closed or after 24 hours.
     </p>
 </div>
 @endsection
 ```
 
-- [ ] **Step 6: Запустити всі тести**
+- [ ] **Step 6: Run all tests**
 
 ```bash
 php artisan test tests/Feature/Console/ --pest
 ```
 
-Очікуємо: `1 passed`
+Expected: `1 passed`
 
 - [ ] **Step 7: Commit**
 
@@ -2028,21 +1796,21 @@ git commit -m "feat: add CleanExpiredOrders command (hourly cron) + Privacy Poli
 
 ---
 
-## Task 11: Filament admin panel
+## Task 10: Filament admin panel
 
 **Files:**
 - Create: `app/app/Filament/Resources/DocumentFormatResource.php`
 - Create: `app/app/Filament/Pages/StatsPage.php`
 
-> Filament 5 ресурси — стандартний pattern. Якщо API дещо відрізняється від v3, адаптувати відповідно.
+> Filament 5 resources — standard pattern. If the API differs slightly from v3, adapt accordingly.
 
-- [ ] **Step 1: Згенерувати Filament resource**
+- [ ] **Step 1: Generate Filament resource**
 
 ```bash
 php artisan make:filament-resource DocumentFormat --generate
 ```
 
-Відкрити `app/Filament/Resources/DocumentFormatResource.php` і налаштувати form та table:
+Open `app/Filament/Resources/DocumentFormatResource.php` and configure form and table:
 
 ```php
 <?php
@@ -2066,31 +1834,31 @@ class DocumentFormatResource extends Resource
 {
     protected static ?string $model = DocumentFormat::class;
     protected static ?string $navigationIcon = 'heroicon-o-document';
-    protected static ?string $navigationLabel = 'Формати документів';
+    protected static ?string $navigationLabel = 'Document Formats';
 
     public static function form(Form $form): Form
     {
         return $form->schema([
-            TextInput::make('name')->label('Назва')->required(),
-            TextInput::make('country')->label('Країна (ISO)')->maxLength(2)->required(),
-            TextInput::make('width_mm')->label('Ширина, мм')->numeric()->required(),
-            TextInput::make('height_mm')->label('Висота, мм')->numeric()->required(),
+            TextInput::make('name')->label('Name')->required(),
+            TextInput::make('country')->label('Country (ISO)')->maxLength(2)->required(),
+            TextInput::make('width_mm')->label('Width, mm')->numeric()->required(),
+            TextInput::make('height_mm')->label('Height, mm')->numeric()->required(),
             TextInput::make('dpi')->label('DPI')->numeric()->default(300)->required(),
-            TextInput::make('sort_order')->label('Сортування')->numeric()->default(0),
-            Checkbox::make('is_active')->label('Активний'),
+            TextInput::make('sort_order')->label('Sort Order')->numeric()->default(0),
+            Checkbox::make('is_active')->label('Active'),
         ]);
     }
 
     public static function table(Table $table): Table
     {
         return $table->columns([
-            TextColumn::make('name')->label('Назва')->sortable()->searchable(),
-            TextColumn::make('country')->label('Країна'),
-            TextColumn::make('width_mm')->label('Ширина'),
-            TextColumn::make('height_mm')->label('Висота'),
+            TextColumn::make('name')->label('Name')->sortable()->searchable(),
+            TextColumn::make('country')->label('Country'),
+            TextColumn::make('width_mm')->label('Width'),
+            TextColumn::make('height_mm')->label('Height'),
             TextColumn::make('dpi')->label('DPI'),
-            IconColumn::make('is_active')->label('Активний')->boolean(),
-            TextColumn::make('sort_order')->label('Порядок')->sortable(),
+            IconColumn::make('is_active')->label('Active')->boolean(),
+            TextColumn::make('sort_order')->label('Sort Order')->sortable(),
         ])
         ->defaultSort('sort_order')
         ->actions([EditAction::make(), DeleteAction::make()]);
@@ -2107,7 +1875,7 @@ class DocumentFormatResource extends Resource
 }
 ```
 
-- [ ] **Step 2: Створити Stats сторінку в Filament**
+- [ ] **Step 2: Create Stats page in Filament**
 
 ```bash
 php artisan make:filament-page StatsPage
@@ -2125,24 +1893,23 @@ use Filament\Pages\Page;
 class StatsPage extends Page
 {
     protected static ?string $navigationIcon  = 'heroicon-o-chart-bar';
-    protected static ?string $navigationLabel = 'Статистика';
+    protected static ?string $navigationLabel = 'Statistics';
     protected static string  $view            = 'filament.pages.stats-page';
 
     public function getViewData(): array
     {
         return [
-            'total'        => PhotoOrder::count(),
-            'paid'         => PhotoOrder::whereNotNull('paid_at')->count(),
-            'today'        => PhotoOrder::whereDate('created_at', today())->count(),
-            'this_week'    => PhotoOrder::where('created_at', '>=', now()->startOfWeek())->count(),
-            'this_month'   => PhotoOrder::where('created_at', '>=', now()->startOfMonth())->count(),
-            'failed'       => PhotoOrder::where('status', 'failed')->count(),
+            'total'      => PhotoOrder::count(),
+            'today'      => PhotoOrder::whereDate('created_at', today())->count(),
+            'this_week'  => PhotoOrder::where('created_at', '>=', now()->startOfWeek())->count(),
+            'this_month' => PhotoOrder::where('created_at', '>=', now()->startOfMonth())->count(),
+            'failed'     => PhotoOrder::where('status', 'failed')->count(),
         ];
     }
 }
 ```
 
-- [ ] **Step 3: Створити шаблон для Stats сторінки**
+- [ ] **Step 3: Create Stats page template**
 
 ```bash
 mkdir -p app/resources/views/filament/pages
@@ -2153,46 +1920,42 @@ mkdir -p app/resources/views/filament/pages
 <x-filament-panels::page>
     <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
         <div class="bg-white rounded-xl shadow p-6">
-            <p class="text-sm text-gray-500">Всього замовлень</p>
+            <p class="text-sm text-gray-500">Total Orders</p>
             <p class="text-3xl font-bold text-gray-800">{{ $total }}</p>
         </div>
         <div class="bg-white rounded-xl shadow p-6">
-            <p class="text-sm text-gray-500">Оплачено</p>
-            <p class="text-3xl font-bold text-green-600">{{ $paid }}</p>
-        </div>
-        <div class="bg-white rounded-xl shadow p-6">
-            <p class="text-sm text-gray-500">Сьогодні</p>
+            <p class="text-sm text-gray-500">Today</p>
             <p class="text-3xl font-bold text-blue-600">{{ $today }}</p>
         </div>
         <div class="bg-white rounded-xl shadow p-6">
-            <p class="text-sm text-gray-500">Цього тижня</p>
+            <p class="text-sm text-gray-500">This Week</p>
             <p class="text-3xl font-bold text-gray-700">{{ $this_week }}</p>
         </div>
         <div class="bg-white rounded-xl shadow p-6">
-            <p class="text-sm text-gray-500">Цього місяця</p>
+            <p class="text-sm text-gray-500">This Month</p>
             <p class="text-3xl font-bold text-gray-700">{{ $this_month }}</p>
         </div>
         <div class="bg-white rounded-xl shadow p-6">
-            <p class="text-sm text-gray-500">Помилок</p>
+            <p class="text-sm text-gray-500">Failed</p>
             <p class="text-3xl font-bold text-red-500">{{ $failed }}</p>
         </div>
     </div>
 </x-filament-panels::page>
 ```
 
-- [ ] **Step 4: Перевірити що Filament доступний**
+- [ ] **Step 4: Verify Filament is accessible**
 
 ```bash
 php artisan filament:check-panel
 ```
 
-або просто:
+or simply:
 
 ```bash
 php artisan serve
 ```
 
-Відкрити `http://localhost:8000/admin` та перевірити що сторінки `Формати документів` та `Статистика` доступні.
+Open `http://localhost:8000/admin` and verify that the `Document Formats` and `Statistics` pages are available.
 
 - [ ] **Step 5: Commit**
 
@@ -2203,13 +1966,13 @@ git commit -m "feat: add Filament admin panel with DocumentFormat CRUD and Stats
 
 ---
 
-## Task 12: DocumentFormatSeeder + повний запуск
+## Task 11: DocumentFormatSeeder + full launch
 
 **Files:**
 - Create: `app/database/seeders/DocumentFormatSeeder.php`
 - Modify: `app/database/seeders/DatabaseSeeder.php`
 
-- [ ] **Step 1: Створити seeder з реальними форматами**
+- [ ] **Step 1: Create seeder with real formats**
 
 ```php
 <?php
@@ -2225,16 +1988,16 @@ class DocumentFormatSeeder extends Seeder
     public function run(): void
     {
         $formats = [
-            // Україна
-            ['name' => 'Паспорт UA',      'country' => 'UA', 'width_mm' => 35, 'height_mm' => 45, 'dpi' => 300, 'sort_order' => 10],
-            ['name' => 'Закордонний пас.','country' => 'UA', 'width_mm' => 35, 'height_mm' => 45, 'dpi' => 300, 'sort_order' => 20],
-            ['name' => 'ID-картка UA',    'country' => 'UA', 'width_mm' => 25, 'height_mm' => 35, 'dpi' => 300, 'sort_order' => 30],
-            // США
-            ['name' => 'US Passport',     'country' => 'US', 'width_mm' => 51, 'height_mm' => 51, 'dpi' => 300, 'sort_order' => 40],
-            ['name' => 'US Visa',         'country' => 'US', 'width_mm' => 51, 'height_mm' => 51, 'dpi' => 300, 'sort_order' => 50],
-            // ЄС
-            ['name' => 'EU Passport',     'country' => 'EU', 'width_mm' => 35, 'height_mm' => 45, 'dpi' => 300, 'sort_order' => 60],
-            ['name' => 'Schengen Visa',   'country' => 'EU', 'width_mm' => 35, 'height_mm' => 45, 'dpi' => 300, 'sort_order' => 70],
+            // Ukraine
+            ['name' => 'Passport UA',        'country' => 'UA', 'width_mm' => 35, 'height_mm' => 45, 'dpi' => 300, 'sort_order' => 10],
+            ['name' => 'International Pass.','country' => 'UA', 'width_mm' => 35, 'height_mm' => 45, 'dpi' => 300, 'sort_order' => 20],
+            ['name' => 'ID Card UA',         'country' => 'UA', 'width_mm' => 25, 'height_mm' => 35, 'dpi' => 300, 'sort_order' => 30],
+            // USA
+            ['name' => 'US Passport',        'country' => 'US', 'width_mm' => 51, 'height_mm' => 51, 'dpi' => 300, 'sort_order' => 40],
+            ['name' => 'US Visa',            'country' => 'US', 'width_mm' => 51, 'height_mm' => 51, 'dpi' => 300, 'sort_order' => 50],
+            // EU
+            ['name' => 'EU Passport',        'country' => 'EU', 'width_mm' => 35, 'height_mm' => 45, 'dpi' => 300, 'sort_order' => 60],
+            ['name' => 'Schengen Visa',      'country' => 'EU', 'width_mm' => 35, 'height_mm' => 45, 'dpi' => 300, 'sort_order' => 70],
         ];
 
         foreach ($formats as $data) {
@@ -2247,47 +2010,47 @@ class DocumentFormatSeeder extends Seeder
 }
 ```
 
-- [ ] **Step 2: Додати в DatabaseSeeder**
+- [ ] **Step 2: Add to DatabaseSeeder**
 
 ```php
-// app/database/seeders/DatabaseSeeder.php — в методі run():
+// app/database/seeders/DatabaseSeeder.php — in the run() method:
 $this->call(DocumentFormatSeeder::class);
 ```
 
-- [ ] **Step 3: Запустити seed та всі тести**
+- [ ] **Step 3: Run seed and all tests**
 
 ```bash
 php artisan db:seed
 php artisan test --pest
 ```
 
-Очікуємо: всі тести `passed`, 7 форматів у таблиці.
+Expected: all tests `passed`, 7 formats in the table.
 
-- [ ] **Step 4: Перевірити docker-compose збірку**
+- [ ] **Step 4: Verify docker-compose build**
 
 ```bash
 cd /Users/ernestbehinov/Work/photo-processor
 docker compose build app worker
 ```
 
-Очікуємо: `Successfully built` без помилок.
+Expected: `Successfully built` without errors.
 
-- [ ] **Step 5: Запустити всі сервіси**
+- [ ] **Step 5: Start all services**
 
 ```bash
 docker compose up -d
 docker compose exec app php artisan migrate --seed
 ```
 
-Відкрити `http://localhost` — має з'явитись форма завантаження фото.
+Open `http://localhost` — the photo upload form should appear.
 
-- [ ] **Step 6: Smoke-тест повного флоу**
+- [ ] **Step 6: Smoke-test the full flow**
 
-1. Завантажити фото з `test-photos/` через браузер
-2. Обрати формат "Паспорт UA"
-3. Натиснути "Обробити"
-4. Дочекатись прев'ю з watermark (polling кожні 2 сек)
-5. Натиснути "Завантажити" — отримати чисте PNG
+1. Upload a photo from `test-photos/` via the browser
+2. Select format "Passport UA"
+3. Click "Process Photo"
+4. Wait for the photo preview to appear (polling every 2 sec)
+5. Click "Download Free" — receive the clean PNG
 
 - [ ] **Step 7: Final commit**
 
@@ -2297,34 +2060,3 @@ git commit -m "feat: add DocumentFormatSeeder with real passport/visa formats"
 ```
 
 ---
-
-## Self-Review
-
-### Spec coverage
-
-| Вимога специфікації | Задача |
-|---------------------|--------|
-| FastAPI width_mm/height_mm/dpi params | Task 1 |
-| Laravel + Docker Compose (app/worker/redis/processor) | Task 2 |
-| document_formats + photo_orders таблиці | Task 3 |
-| PhotoProcessorClient HTTP | Task 4 |
-| Watermark через GD | Task 5 |
-| ProcessPhotoJob (clean + watermark) | Task 6 |
-| Livewire 3-step flow (upload/polling/download) | Task 7 |
-| Routes + PhotoController (preview/result/download) | Tasks 8-9 |
-| Privacy Policy сторінка + чекбокс | Task 8, 10 |
-| Auto-cleanup cron через 24h | Task 10 |
-| Filament CRUD DocumentFormat | Task 11 |
-| Filament статистика | Task 11 |
-| Seeder з реальними форматами | Task 12 |
-| Payment stub (paid_at) | Task 7 (pay method) |
-| UUID-based order URL | Task 3, 7 |
-
-### Gaps: немає
-
-### Type consistency: перевірено
-
-- `PhotoOrder::expired()` scope використовується в Task 10 ✓
-- `DocumentFormat::active()` scope використовується в Task 7 ✓
-- `PhotoProcessorClient::process($bytes, $w, $h, $dpi)` → Task 6 ✓
-- `WatermarkService::apply($bytes)` → Task 6 ✓

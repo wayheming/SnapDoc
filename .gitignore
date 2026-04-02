@@ -1,0 +1,6 @@
+.idea/
+.superpowers/
+__pycache__/
+*.pyc
+test-photos/
+.DS_Store
